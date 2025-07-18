@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Rock Paper Scissors Game</title>
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@latest/dist/tf.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@teachablemachine/image@latest/dist/teachablemachine-image.min.js"></script>
+    <style>
+        .hidden { display: none; }
+        #webcam-container { margin-bottom: 10px; }
+        #player-gesture { 
+            margin-top: 5px; 
+            font-weight: bold;
+            color: #333;
+        }
+        #countdown-timer {
+            font-size: 24px;
+            color: #ff4444;
+            margin: 10px 0;
+        }
+    </style>
+</head>
+<body>
+    <div>Rock Paper Scissors Game</div>
+    <button type="button" id="startButton" onclick="init()">Start Game</button>
+    <button type="button" id="playAgainButton" onclick="startRound()" class="hidden">Play Another Round</button>
+    <div id="webcam-container"></div>
+    <div id="player-gesture"></div>
+    <div id="countdown-timer"></div>
+    <div id="countdown-container"></div>
+    <div id="game-status"></div>
+    <div id="label-container"></div>
+
+    <script type="text/javascript">
+        const URL = "{{ url_for('static', filename='my_model/') }}";
+        let model, webcam, labelContainer, maxPredictions;
+        let isGameRunning = false;
+
+        async function init() {
+            if (isGameRunning) return;
+            isGameRunning = true;
+            document.getElementById('startButton').classList.add('hidden');
+
+            const modelURL = URL + "model.json";
+            const metadataURL = URL + "metadata.json";
+
+            // Initialize status display
+            const gameStatus = document.getElementById('game-status');
+            gameStatus.textContent = "Initializing camera...";
+
+            // Load the model and setup webcam
+            model = await tmImage.load(modelURL, metadataURL);
+            maxPredictions = model.getTotalClasses();
+
+            const flip = true;
+            webcam = new tmImage.Webcam(200, 200, flip);
+            await webcam.setup();
+            await webcam.play();
+
+            document.getElementById("webcam-container").appendChild(webcam.canvas);
+            labelContainer = document.getElementById("label-container");
+            
+            // Start the first round!
+            startRound();
+        }
+    
+    let gestureUpdateInterval;
+
+    async function updatePlayerGesture() {
+    if (!model || !webcam) return;
+    
+    webcam.update();
+    const prediction = await model.predict(webcam.canvas);
+    let currentGesture = '';
+    let highestProbability = 0;
+
+    for (let i = 0; i < maxPredictions; i++) {
+        if (prediction[i].probability > highestProbability) {
+            highestProbability = prediction[i].probability;
+            currentGesture = prediction[i].className;
+        }
+    }
+
+    document.getElementById('player-gesture').textContent = 
+        `Current gesture: ${currentGesture} (${(highestProbability * 100).toFixed(1)}% confident)`;
+}
+
+async function startRound() {
+    document.getElementById('playAgainButton').classList.add('hidden');
+    labelContainer.innerHTML = '';
+    const countdownContainer = document.getElementById('countdown-container');
+    const countdownTimer = document.getElementById('countdown-timer');
+    const gameStatus = document.getElementById('game-status');
+
+    // Start continuous gesture detection
+    if (gestureUpdateInterval) clearInterval(gestureUpdateInterval);
+    gestureUpdateInterval = setInterval(updatePlayerGesture, 100);
+
+    // 5 second countdown
+    for (let i = 5; i > 0; i--) {
+        countdownTimer.textContent = `⏲️ ${i}`;
+        countdownContainer.textContent = `Get ready! Game starts in ${i} seconds...`;
+        await new Promise(resolve => setTimeout(resolve, 1000));
+    }
+    countdownTimer.textContent = '';
+    countdownContainer.textContent = '';
+
+    // Make prediction and determine winner
+    const result = await makeGameDecision();
+    gameStatus.textContent = result;
+
+    // Stop webcam updates and gesture detection
+    clearInterval(gestureUpdateInterval);
+    document.getElementById('player-gesture').textContent = '';
+
+    // Show play again button
+    document.getElementById('playAgainButton').classList.remove('hidden');
+    isGameRunning = false;
+}
+
+async function makeGameDecision() {
+    webcam.update();
+    const prediction = await model.predict(webcam.canvas);
+    let userChoice = '';
+    let highestProbability = 0;
+
+    for (let i = 0; i < maxPredictions; i++) {
+        if (prediction[i].probability > highestProbability) {
+            highestProbability = prediction[i].probability;
+            userChoice = prediction[i].className;
+        }
+    }
+
+    const choices = ['Rock', 'Paper', 'Scissors'];
+    const emojis = {'Rock': '🪨', 'Paper': '📄', 'Scissors': '✂️'};
+    const computerChoice = choices[Math.floor(Math.random() * choices.length)];
+
+    if (userChoice === computerChoice) {
+        return `Computer chose: ${emojis[computerChoice]} ${computerChoice}. It's a draw!`;
+    } else if (
+        (userChoice === 'Rock' && computerChoice === 'Scissors') ||
+        (userChoice === 'Paper' && computerChoice === 'Rock') ||
+        (userChoice === 'Scissors' && computerChoice === 'Paper')
+    ) {
+        return `Computer chose: ${emojis[computerChoice]} ${computerChoice}. You win! ${emojis[userChoice]}`;
+    } else {
+        return `Computer chose: ${emojis[computerChoice]} ${computerChoice}. You lose! ${emojis[userChoice]}`;
+    }
+}
+    </script>
+</body>
+</html>
