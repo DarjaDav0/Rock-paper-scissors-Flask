@@ -33,7 +33,7 @@
     <div id="label-container"></div>
 
     <script type="text/javascript">
-        const URL = "{{ url_for('static', filename='my_model/') }}";
+        const URL = "./Rock-paper-scissors-Flask/static/my_model/";
         let model, webcam, labelContainer, maxPredictions;
         let isGameRunning = false;
 
@@ -45,24 +45,41 @@
             const modelURL = URL + "model.json";
             const metadataURL = URL + "metadata.json";
 
-            // Initialize status display
+            //initialize status display
             const gameStatus = document.getElementById('game-status');
-            gameStatus.textContent = "Initializing camera...";
+            gameStatus.textContent = "Requesting camera permission...";
 
-            // Load the model and setup webcam
-            model = await tmImage.load(modelURL, metadataURL);
-            maxPredictions = model.getTotalClasses();
+            //check for camera support
+                if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+                    throw new Error("Browser doesn't support camera access");
+                }
 
-            const flip = true;
-            webcam = new tmImage.Webcam(200, 200, flip);
-            await webcam.setup();
-            await webcam.play();
+                //request camera permission explicitly
+                await navigator.mediaDevices.getUserMedia({ video: true });
 
-            document.getElementById("webcam-container").appendChild(webcam.canvas);
-            labelContainer = document.getElementById("label-container");
-            
-            // Start the first round!
-            startRound();
+            //load the model and setup webcam
+            try {
+                model = await tmImage.load(modelURL, metadataURL);
+                maxPredictions = model.getTotalClasses();
+
+                const flip = true;
+                webcam = new tmImage.Webcam(200, 200, flip);
+
+                await webcam.setup();
+                await webcam.play();
+                gameStatus.textContent = "Camera ready!";
+
+                document.getElementById("webcam-container").appendChild(webcam.canvas);
+                labelContainer = document.getElementById("label-container");
+
+                //start the first round!
+                startRound();
+            } catch (error) {
+                gameStatus.textContent = "Error: " + error.message;
+                isGameRunning = false;
+                document.getElementById('startButton').classList.remove('hidden');
+                console.error(error);
+            }
         }
     
     let gestureUpdateInterval;
@@ -93,11 +110,11 @@ async function startRound() {
     const countdownTimer = document.getElementById('countdown-timer');
     const gameStatus = document.getElementById('game-status');
 
-    // Start continuous gesture detection
+    //start continuous gesture detection
     if (gestureUpdateInterval) clearInterval(gestureUpdateInterval);
     gestureUpdateInterval = setInterval(updatePlayerGesture, 100);
 
-    // 5 second countdown
+    //5 second countdown
     for (let i = 5; i > 0; i--) {
         countdownTimer.textContent = `⏲️ ${i}`;
         countdownContainer.textContent = `Get ready! Game starts in ${i} seconds...`;
@@ -106,15 +123,15 @@ async function startRound() {
     countdownTimer.textContent = '';
     countdownContainer.textContent = '';
 
-    // Make prediction and determine winner
+    //make prediction and determine winner
     const result = await makeGameDecision();
     gameStatus.textContent = result;
 
-    // Stop webcam updates and gesture detection
+    //stop webcam updates and gesture detection
     clearInterval(gestureUpdateInterval);
     document.getElementById('player-gesture').textContent = '';
 
-    // Show play again button
+    //show play again button
     document.getElementById('playAgainButton').classList.remove('hidden');
     isGameRunning = false;
 }
