@@ -49,12 +49,12 @@
             const gameStatus = document.getElementById('game-status');
             gameStatus.textContent = "Requesting camera permission...";
 
-            //check for camera support
+            //check for camera support Made by AI
                 if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
                     throw new Error("Browser doesn't support camera access");
                 }
 
-                //request camera permission explicitly
+                //request camera permission explicitly Made by AI
                 await navigator.mediaDevices.getUserMedia({ video: true });
 
             //load the model and setup webcam
@@ -74,7 +74,7 @@
 
                 //start the first round!
                 startRound();
-            } catch (error) {
+            } catch (error) { //Made by AI
                 gameStatus.textContent = "Error: " + error.message;
                 isGameRunning = false;
                 document.getElementById('startButton').classList.remove('hidden');
